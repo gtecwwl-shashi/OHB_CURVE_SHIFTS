@@ -16,9 +16,9 @@ def calculate_sao2(po2_kpa, p50):
 
 # --- SIDEBAR: CONTROLS ---
 st.sidebar.header("1. Identify the Graph")
-x_label = st.sidebar.text_input("X-axis Label", "PaO2 (kPa)")
-y_label = st.sidebar.text_input("Y-axis Label", "SaO2 (%)")
-show_scale = st.sidebar.checkbox("Reveal Scale (0-14 kPa)", value=True)
+x_label = st.sidebar.text_input("X-axis Label", "")
+y_label = st.sidebar.text_input("Y-axis Label", "")
+show_scale = st.sidebar.checkbox("Reveal Scale (0-14 kPa)", value=False)
 
 st.sidebar.header("2. Clinical Shifts")
 curve_mode = st.sidebar.selectbox("Select Clinical State:", 
@@ -39,7 +39,7 @@ else:
 st.sidebar.header("3. Trainee Extractions")
 inputs = []
 for i in range(1, 7):
-    val = st.sidebar.number_input(f"Doctor {i} PaO2", 0.0, 14.0, value=0.0, step=0.1)
+    val = st.sidebar.number_input(f"Doctor {i} PaO2 (kPa)", 0.0, 14.0, value=0.0, step=0.1)
     inputs.append(val)
 
 # --- PLOTTING ---
@@ -49,4 +49,35 @@ fig = go.Figure()
 x_ref = np.linspace(0.1, 14, 500)
 y_ref = [calculate_sao2(x, p50_normal) for x in x_ref]
 fig.add_trace(go.Scatter(x=x_ref, y=y_ref, name='Normal Reference', 
-                         line
+                         line=dict(color='lightgray', width=2, dash='dash')))
+
+# Plot Trainee Points
+for i, val in enumerate(inputs):
+    if val > 0:
+        actual_sat = round(calculate_sao2(val, p50_active), 1)
+        fig.add_trace(go.Scatter(x=[val], y=[actual_sat], mode='markers+text',
+                                 text=[f"Dr {i+1}"], textposition="top center",
+                                 marker=dict(size=14, color='black', symbol='diamond')))
+
+# Graph Layout (0-14 kPa, 2 kPa gaps)
+fig.update_layout(
+    xaxis_title=x_label if x_label else "--- ??? ---",
+    yaxis_title=y_label if y_label else "--- ??? ---",
+    xaxis=dict(range=[0, 14.5], tickvals=[0, 2, 4, 6, 8, 10, 12, 14], showticklabels=show_scale),
+    yaxis=dict(range=[0, 105], tickvals=[0, 20, 40, 60, 80, 100], showticklabels=show_scale),
+    height=750, template="plotly_white", plot_bgcolor='white'
+)
+
+# SHOW ACTIVE CURVE
+reveal = st.checkbox("REVEAL ACTIVE CLINICAL CURVE")
+if reveal:
+    y_active = [calculate_sao2(x, p50_active) for x in x_ref]
+    fig.add_trace(go.Scatter(x=x_ref, y=y_active, name=curve_mode, 
+                             line=dict(color=active_color, width=4)))
+
+st.plotly_chart(fig, use_container_width=True)
+
+# --- BOHR EFFECT EXPLANATION ---
+st.markdown("---")
+st.header("The Bohr Effect")
+st.info("**The Bohr Effect** is the physiological phenomenon where an increase in $CO_2$ or $H^+$ (acidity) results in a **Right Shift** of the curve. This is crucial at the tissue level: as metabolically active tissues produce $CO_2$, the hemoglobin affinity for oxygen decreases, allowing it to unload oxygen exactly where it is needed.")
